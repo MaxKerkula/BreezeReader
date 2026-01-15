@@ -154,6 +154,20 @@ const RSVPReader: React.FC<RSVPReaderProps> = ({
     return `${Math.floor(sec / 60)}m ${Math.floor(sec % 60)}s`;
   }, [words.length, wordIndex, settings.wpm]);
 
+  // Dynamic Font Scaling for Single Mode
+  const singleModeFontSize = useMemo(() => {
+    const base = settings.fontSize * 2;
+    const word = words[wordIndex] || "";
+    const len = word.length;
+    
+    // If word is short enough, use base size
+    if (len <= 10) return `clamp(2rem, ${base}px, 12vw)`;
+
+    // Calculate scale factor: e.g., 20 chars -> ~0.6x size
+    const scale = Math.max(0.25, 12 / len); 
+    return `clamp(1rem, ${base * scale}px, 12vw)`;
+  }, [settings.fontSize, wordIndex, words]);
+
   const renderORPWord = (word: string) => {
     const len = word.length;
     let orp = 0;
@@ -164,11 +178,29 @@ const RSVPReader: React.FC<RSVPReaderProps> = ({
     const right = word.substring(orp + 1);
 
     return (
-      <div className="flex w-full items-baseline justify-center whitespace-normal break-anywhere">
+      <div className="flex w-full items-baseline justify-center whitespace-nowrap">
         <div className="flex-1 text-right text-slate-200 font-normal tracking-tight opacity-80 overflow-hidden text-ellipsis">{left}</div>
         <div className="text-red-500 font-black px-[1px] transform scale-110 drop-shadow-[0_0_15px_rgba(239,68,68,0.9)] z-10">{center}</div>
         <div className="flex-1 text-left text-slate-200 font-normal tracking-tight opacity-80 overflow-hidden text-ellipsis">{right}</div>
       </div>
+    );
+  };
+
+  const renderInlineORP = (word: string) => {
+    const len = word.length;
+    let orp = 0;
+    if (len > 1) orp = len <= 5 ? 1 : len <= 9 ? 2 : len <= 13 ? 3 : 4;
+
+    const left = word.substring(0, orp);
+    const center = word.substring(orp, orp + 1);
+    const right = word.substring(orp + 1);
+
+    return (
+      <span className="inline-block">
+        <span className="opacity-90">{left}</span>
+        <span className="text-red-500 font-black mx-[0.5px] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">{center}</span>
+        <span className="opacity-90">{right}</span>
+      </span>
     );
   };
 
@@ -290,7 +322,7 @@ const RSVPReader: React.FC<RSVPReaderProps> = ({
                    className="relative w-full flex items-center justify-center text-center h-full"
                  >
                     <div style={{ 
-                        fontSize: `clamp(2rem, ${settings.fontSize * 2}px, 12vw)`,
+                        fontSize: settings.mode === 'rsvp-single' ? singleModeFontSize : `clamp(2rem, ${settings.fontSize * 2}px, 12vw)`,
                         fontFamily: settings.fontFamily === 'JetBrains Mono' ? 'JetBrains Mono' : settings.fontFamily,
                         lineHeight: 1.1,
                         width: '100%',
@@ -323,13 +355,15 @@ const RSVPReader: React.FC<RSVPReaderProps> = ({
                             <div className="w-full overflow-hidden mask-linear-fade">
                                 <div className="flex justify-center items-baseline gap-16 whitespace-nowrap">
                                     {words.slice(Math.max(0, wordIndex - 2), Math.min(words.length, wordIndex + 3)).map((w, i) => {
+                                        const absIndex = i + Math.max(0, wordIndex - 2);
+                                        const isCurrent = absIndex === wordIndex;
                                         return (
                                             <span key={i} className={`transition-all duration-200 ${
-                                                (i + Math.max(0, wordIndex - 2)) === wordIndex 
-                                                ? 'text-white scale-110 font-bold opacity-100 drop-shadow-xl' 
+                                                isCurrent 
+                                                ? 'text-white scale-125 font-bold opacity-100 drop-shadow-2xl z-10' 
                                                 : 'text-slate-500 scale-75 opacity-30 blur-[1px]'
                                             }`}>
-                                                {processBionicText(w, settings.boldRatio)}
+                                                {isCurrent ? renderInlineORP(w) : processBionicText(w, settings.boldRatio)}
                                             </span>
                                         )
                                     })}
