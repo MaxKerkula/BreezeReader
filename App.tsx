@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Zap, Loader2, Library, BarChart2,  
   Trash2, FileCode, Sparkles, Trophy, 
-  Settings, X, Book, BrainCircuit, Edit2, Check, ArrowLeft
+  Settings, Check, ArrowLeft, Key, Edit2, Book
 } from 'lucide-react';
 import { ReadingSettings, LibraryItem, ReadingSession, VocabularyWord } from './types';
 import SettingsPanel from './components/SettingsPanel';
@@ -21,6 +20,8 @@ const generateId = () => {
 };
 
 const App: React.FC = () => {
+  const [hasApiKey, setHasApiKey] = useState(false);
+
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [view, setView] = useState<'landing' | 'library' | 'reader' | 'stats' | 'vocab' | 'import'>('landing');
@@ -48,6 +49,30 @@ const App: React.FC = () => {
   const activeItem = useMemo(() => 
     library.find(item => item.id === activeItemId) || null, 
   [library, activeItemId]);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      try {
+        if ((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey()) {
+          setHasApiKey(true);
+        }
+      } catch (e) {
+        console.warn("API Key check failed, defaulting to free mode.");
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    try {
+      if ((window as any).aistudio) {
+        await (window as any).aistudio.openSelectKey();
+        setHasApiKey(true);
+      }
+    } catch (e) {
+      console.error("Failed to open key selector", e);
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -112,11 +137,9 @@ const App: React.FC = () => {
       }
       else if (lowerName.endsWith('.rtf')) {
          const raw = await file.text();
-         // Basic RTF strip
          text = raw.replace(/\\par[d]?/g, '\n').replace(/\\.[^;{}]*;/g, '').replace(/[\\{}]+/g, '');
       }
       else { 
-        // fallback for txt, md, etc.
         text = await file.text(); 
       }
 
@@ -153,14 +176,29 @@ const App: React.FC = () => {
 
   const transformWithAi = async () => {
     if (!activeItem || isLoadingAi) return;
+    
+    // Check key before attempting
+    if (!hasApiKey && (window as any).aistudio) {
+        try {
+            await (window as any).aistudio.openSelectKey();
+            setHasApiKey(true);
+        } catch(e) {
+            alert("API Key required for AI features. Please connect in Settings.");
+            return;
+        }
+    }
+
     setIsLoadingAi(true);
     try {
-      const simplified = await geminiService.simplify(activeItem.content);
+      const simplified = await geminiService.rewrite(activeItem.content);
       const newTotal = simplified.split(/\s+/).filter(w => w.length > 0).length;
       setLibrary(prev => prev.map(item => 
         item.id === activeItem.id ? { ...item, content: simplified, totalWords: newTotal, lastPosition: 0 } : item
       ));
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+        console.error(error);
+        alert("AI Rewrite failed. Check connection.");
+    }
     finally { setIsLoadingAi(false); }
   };
 
@@ -216,13 +254,13 @@ const App: React.FC = () => {
       className={`min-h-screen flex flex-col transition-colors duration-700 ${themeClass}`}
       style={{ fontFamily: settings.fontFamily }}
     >
-      <header className="px-10 h-24 flex items-center justify-between border-b border-white/5 sticky top-0 z-[60] bg-black/40 backdrop-blur-3xl">
+      <header className="px-6 md:px-10 h-24 flex items-center justify-between border-b border-white/5 sticky top-0 z-[60] bg-black/40 backdrop-blur-3xl">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('landing')}>
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-600/30 group-hover:scale-105 transition-all">
-              <Zap className="w-6 h-6 text-white fill-current" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-600/30 group-hover:scale-105 transition-all">
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white fill-current" />
             </div>
-            <span className="font-black text-2xl tracking-tighter uppercase italic">Breeze<span className="text-indigo-500">Reader</span></span>
+            <span className="hidden md:block font-black text-2xl tracking-tighter uppercase italic">Breeze<span className="text-indigo-500">Reader</span></span>
           </div>
           
           <nav className="hidden xl:flex ml-12 gap-8">
@@ -249,10 +287,10 @@ const App: React.FC = () => {
                <button 
                 onClick={transformWithAi}
                 disabled={isLoadingAi}
-                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 flex items-center gap-2 shadow-xl shadow-indigo-600/20"
+                className="hidden sm:flex px-4 py-3 md:px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 items-center gap-2 shadow-xl shadow-indigo-600/20"
                >
                  {isLoadingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                 <span className="text-[10px] font-black uppercase tracking-widest">AI Simplify</span>
+                 <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">AI Rewrite</span>
                </button>
                <button onClick={() => setShowSettings(!showSettings)} className="p-3 rounded-2xl border border-white/10 bg-white/5 text-slate-400 hover:text-white transition-all">
                   <Settings className="w-6 h-6" />
@@ -265,14 +303,28 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      {/* Settings Modal Layer */}
+      {showSettings && (
+         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowSettings(false)}>
+            <div className="w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+                <SettingsPanel 
+                   settings={settings} 
+                   setSettings={setSettings} 
+                   hasApiKey={hasApiKey}
+                   onConnectAi={handleSelectKey}
+                />
+            </div>
+         </div>
+      )}
+
       <main className="flex-1 flex flex-col relative overflow-hidden">
         
         {view === 'landing' && (
             <div className="max-w-7xl mx-auto w-full pt-24 px-10 pb-20 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                <div className="grid grid-cols-1 lg:grid-cols-5 gap-20 items-center">
                   <div className="lg:col-span-2 space-y-10">
-                     <h1 className="text-8xl xl:text-9xl font-black tracking-tighter leading-none italic uppercase">Read<br/><span className="text-indigo-600">Faster.</span></h1>
-                     <p className="text-2xl text-slate-500 font-medium leading-relaxed max-w-md">Professional speed reading suite.</p>
+                     <h1 className="text-7xl sm:text-8xl xl:text-9xl font-black tracking-tighter leading-none italic uppercase">Read<br/><span className="text-indigo-600">Faster.</span></h1>
+                     <p className="text-2xl text-slate-500 font-medium leading-relaxed max-w-md">Professional speed reading suite with dyslexia support.</p>
                      <div className="grid grid-cols-2 gap-4">
                         <div onClick={() => setView('vocab')} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] space-y-2 cursor-pointer hover:bg-white/10 transition-colors">
                            <Trophy className="w-6 h-6 text-indigo-500" />
@@ -358,57 +410,25 @@ const App: React.FC = () => {
                         </div>
                      </div>
                   ))}
-                  <div onClick={() => setView('import')} className="group bg-transparent border-2 border-dashed border-white/10 hover:border-indigo-500/50 rounded-[3.5rem] p-10 transition-all cursor-pointer flex flex-col items-center justify-center gap-6 min-h-[300px]">
-                      <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Zap className="w-6 h-6 text-slate-600 group-hover:text-indigo-500" />
-                      </div>
-                      <span className="font-black uppercase tracking-widest text-xs text-slate-600 group-hover:text-indigo-400">Import New</span>
-                  </div>
                </div>
             </div>
         )}
 
-        {view === 'vocab' && (
-            <VocabularyView library={library} onUpdateWord={handleUpdateWord} />
-        )}
-
-        {view === 'stats' && (
-            <AnalyticsView library={library} />
-        )}
-
         {view === 'reader' && activeItem && (
-             <RSVPReader 
-                 text={activeItem.content} 
-                 settings={settings} 
-                 initialPosition={activeItem.lastPosition}
-                 onPositionChange={updatePosition}
-                 onSessionEnd={logSession}
-                 onDefineWord={addVocab}
-               />
+            <RSVPReader 
+                text={activeItem.content}
+                settings={settings}
+                initialPosition={activeItem.lastPosition}
+                onPositionChange={updatePosition}
+                onSessionEnd={logSession}
+                onDefineWord={addVocab}
+            />
         )}
+
+        {view === 'stats' && <AnalyticsView library={library} />}
+        {view === 'vocab' && <VocabularyView library={library} onUpdateWord={handleUpdateWord} />}
 
       </main>
-
-      {showSettings && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-3xl" onClick={() => setShowSettings(false)} />
-          <div className="relative w-full max-w-2xl animate-in zoom-in-95 duration-500">
-             <div className="absolute top-8 right-10 z-10"><button onClick={() => setShowSettings(false)} className="p-4 bg-white/5 rounded-full text-slate-400 hover:text-white transition-all"><X className="w-7 h-7" /></button></div>
-             <SettingsPanel settings={settings} setSettings={setSettings} />
-          </div>
-        </div>
-      )}
-
-      {isLoadingAi && (
-        <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
-           <div className="relative mb-8">
-              <div className="w-32 h-32 rounded-full border-2 border-indigo-600/20 border-t-indigo-600 animate-spin" />
-              <BrainCircuit className="absolute inset-0 m-auto w-10 h-10 text-indigo-500 animate-pulse" />
-           </div>
-           <h2 className="text-xl font-black italic uppercase tracking-widest text-white">Gemini Synthesis Engine</h2>
-           <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.4em] mt-2">Optimizing text structure...</p>
-        </div>
-      )}
     </div>
   );
 };

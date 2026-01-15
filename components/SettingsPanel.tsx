@@ -4,15 +4,17 @@ import { ReadingSettings, Theme, ReadingMode } from '../types';
 import { 
   Type, Moon, Sun, Coffee, Zap, Sliders, 
   Layers, ArrowRightLeft, AlignLeft, Bold, Target,
-  BrainCircuit, BookOpen
+  BrainCircuit, BookOpen, Key
 } from 'lucide-react';
 
 interface SettingsPanelProps {
   settings: ReadingSettings;
   setSettings: (settings: ReadingSettings) => void;
+  hasApiKey: boolean;
+  onConnectAi: () => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, hasApiKey, onConnectAi }) => {
   const updateSetting = (key: keyof ReadingSettings, value: any) => {
     setSettings({ ...settings, [key]: value });
   };
@@ -43,6 +45,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings }) 
           <Sliders className="w-6 h-6 text-indigo-500" />
           Engine Configuration
         </h3>
+        
+        {/* AI Key Status */}
+        <button 
+           onClick={onConnectAi}
+           className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-2 transition-all ${
+               hasApiKey 
+               ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+               : 'bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500'
+           }`}
+        >
+            <Key className="w-3 h-3" />
+            {hasApiKey ? 'AI Connected' : 'Connect AI'}
+        </button>
       </div>
 
       {/* Drill Presets */}
@@ -75,7 +90,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings }) 
             }`}
           >
             <BrainCircuit className="w-4 h-4" />
-            AI Context (Best)
+            AI Context
           </button>
           <button
             onClick={() => updateSetting('dictionaryMode', 'standard')}
@@ -89,6 +104,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings }) 
             Standard (Free)
           </button>
         </div>
+        <p className="text-[10px] text-slate-500 font-medium px-2">
+            * AI Mode requires API key. Standard mode automatically handles fallback.
+        </p>
       </div>
 
       {/* Reading Mode */}

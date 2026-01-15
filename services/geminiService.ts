@@ -1,31 +1,42 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
+export interface DefinitionResult {
+  definition: string;
+  examples: string[];
+  alternatives?: { pos: string; def: string }[];
+  source: 'ai' | 'standard';
+}
+
 export class GeminiService {
-  private ai: GoogleGenAI;
-
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  }
-
-  async simplify(text: string): Promise<string> {
+  
+  async rewrite(text: string): Promise<string> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
     try {
-      const response = await this.ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Rewrite the following text to be extremely easy to read for someone with dyslexia. Use short sentences, clear vocabulary, and an active voice. Maintain the core meaning but make it highly accessible. Keep the same general length if possible. Text:\n\n${text.substring(0, 5000)}`,
-        config: {
-          temperature: 0.5,
-        }
+        contents: `Rewrite the following text to optimize it for "Bionic Reading" and RSVP (Rapid Serial Visual Presentation). 
+        
+        Goals:
+        1. Summarize slightly to remove fluff, but keep all key information.
+        2. Break long, complex sentences into shorter, punchy sentences.
+        3. Use active voice.
+        4. Maintain the original tone/sophistication, just make the flow better.
+        
+        Text to rewrite:\n\n${text.substring(0, 5000)}`,
+        config: { temperature: 0.3 }
       });
-      return response.text || "Failed to simplify text.";
+      return response.text || "Failed to rewrite text.";
     } catch (e) {
-      console.error("Gemini simplify error:", e);
-      return "Could not simplify text. Please check API key.";
+      console.error("Gemini rewrite error:", e);
+      throw e;
     }
   }
 
-  async defineWord(word: string, context: string, mode: 'ai' | 'standard' = 'ai'): Promise<{ definition: string; examples: string[] }> {
+  async defineWord(word: string, context: string, mode: 'ai' | 'standard' = 'ai'): Promise<DefinitionResult> {
+    
     // STANDARD MODE (Free Dictionary API)
+    // Also acts as fallback if AI fails or no key
     if (mode === 'standard') {
       try {
         const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
@@ -33,26 +44,30 @@ export class GeminiService {
         
         const data = await response.json();
         const entry = data[0];
-        // Just take the first definition of the first meaning since we lack context awareness in this mode
-        const meaning = entry?.meanings?.[0];
-        const defEntry = meaning?.definitions?.[0];
-
-        if (!defEntry) return { definition: "No definition found.", examples: [] };
+        
+        // Extract all meanings to help user context switch manually
+        const alternatives = entry.meanings.map((m: any) => ({
+             pos: m.partOfSpeech,
+             def: m.definitions[0]?.definition
+        }));
 
         return {
-          definition: defEntry.definition,
-          examples: defEntry.example ? [defEntry.example] : []
+          definition: alternatives[0]?.def || "No definition found.",
+          examples: entry.meanings[0]?.definitions[0]?.example ? [entry.meanings[0]?.definitions[0]?.example] : [],
+          alternatives: alternatives,
+          source: 'standard'
         };
       } catch (e) {
-        return { definition: "Definition not available in standard mode.", examples: [] };
+        return { definition: "Definition not available in standard mode.", examples: [], source: 'standard' };
       }
     }
 
     // AI MODE (Gemini)
     try {
-      const response = await this.ai.models.generateContent({
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Define the word "${word}" as it is used in the following context: "...${context}...". Provide a clear, simple definition and a new example sentence using the word in the same way.`,
+        contents: `Define the word "${word}" as it is used in the following context: "...${context}...". Provide a clear definition and a new example sentence.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -68,20 +83,18 @@ export class GeminiService {
 
       const text = response.text;
       if (!text) throw new Error("No response from AI");
-      
       const data = JSON.parse(text);
 
       return {
         definition: data.definition,
-        examples: [data.example]
+        examples: [data.example],
+        source: 'ai'
       };
 
     } catch (e) {
-      console.warn("Gemini definition failed:", e);
-      return { 
-        definition: "Could not retrieve context-aware definition. Check API Key.", 
-        examples: [] 
-      };
+      console.warn("Gemini definition failed or no key, falling back to standard:", e);
+      // Auto fallback to standard
+      return this.defineWord(word, context, 'standard');
     }
   }
 }
