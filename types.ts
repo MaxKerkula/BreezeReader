@@ -1,6 +1,7 @@
 
 export type Theme = 'light' | 'dark' | 'sepia';
 export type ReadingMode = 'rsvp-single' | 'rsvp-chunk' | 'flow' | 'classic';
+export type DictionaryMode = 'ai' | 'standard';
 
 export interface ReadingSession {
   date: number;
@@ -15,6 +16,9 @@ export interface VocabularyWord {
   definition: string;
   examples: string[];
   date: number;
+  // SRS Fields
+  proficiency: number; // 0 = New, 1 = Hard, 2 = Good, 3 = Mastered
+  nextReview: number; // Timestamp
 }
 
 export interface LibraryItem {
@@ -36,6 +40,7 @@ export interface ReadingSettings {
   fontFamily: 'Inter' | 'Lexend' | 'JetBrains Mono' | 'OpenDyslexic';
   theme: Theme;
   mode: ReadingMode;
+  dictionaryMode: DictionaryMode;
   wpm: number;
   chunkSize: number;
   showFocusGuide: boolean;

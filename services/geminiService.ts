@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 export class GeminiService {
   private ai: GoogleGenAI;
@@ -24,32 +24,64 @@ export class GeminiService {
     }
   }
 
-  async defineWord(word: string, context: string): Promise<{ definition: string; examples: string[] }> {
-    try {
-      // Using the Free Dictionary API
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-      
-      if (!response.ok) {
-        throw new Error('Word not found');
+  async defineWord(word: string, context: string, mode: 'ai' | 'standard' = 'ai'): Promise<{ definition: string; examples: string[] }> {
+    // STANDARD MODE (Free Dictionary API)
+    if (mode === 'standard') {
+      try {
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        if (!response.ok) throw new Error('Word not found');
+        
+        const data = await response.json();
+        const entry = data[0];
+        // Just take the first definition of the first meaning since we lack context awareness in this mode
+        const meaning = entry?.meanings?.[0];
+        const defEntry = meaning?.definitions?.[0];
+
+        if (!defEntry) return { definition: "No definition found.", examples: [] };
+
+        return {
+          definition: defEntry.definition,
+          examples: defEntry.example ? [defEntry.example] : []
+        };
+      } catch (e) {
+        return { definition: "Definition not available in standard mode.", examples: [] };
       }
+    }
 
-      const data = await response.json();
+    // AI MODE (Gemini)
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Define the word "${word}" as it is used in the following context: "...${context}...". Provide a clear, simple definition and a new example sentence using the word in the same way.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              definition: { type: Type.STRING, description: "The definition of the word in context" },
+              example: { type: Type.STRING, description: "An example sentence using the word" }
+            },
+            required: ["definition", "example"]
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("No response from AI");
       
-      // Navigate the response structure to find the first definition
-      const entry = data[0];
-      const meaning = entry?.meanings?.[0];
-      const defEntry = meaning?.definitions?.[0];
-
-      if (!defEntry) return { definition: "No definition found.", examples: [] };
+      const data = JSON.parse(text);
 
       return {
-        definition: defEntry.definition,
-        examples: defEntry.example ? [defEntry.example] : []
+        definition: data.definition,
+        examples: [data.example]
       };
 
     } catch (e) {
-      console.warn("Dictionary lookup failed:", e);
-      return { definition: "Definition not available.", examples: [] };
+      console.warn("Gemini definition failed:", e);
+      return { 
+        definition: "Could not retrieve context-aware definition. Check API Key.", 
+        examples: [] 
+      };
     }
   }
 }

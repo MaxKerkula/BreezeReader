@@ -1,0 +1,18 @@
+
+{
+  "manifest_version": 3,
+  "name": "BreezeReader",
+  "version": "1.0.0",
+  "description": "Speed reading accessible assistant.",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Open BreezeReader"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; object-src 'self'"
+  }
+}

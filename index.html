@@ -7,6 +7,7 @@
     <title>BreezeReader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lexend:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.cdnfonts.com/css/opendyslexic" rel="stylesheet">
     <style>
@@ -29,6 +30,12 @@
             max-height: calc(100vh - 200px);
             overflow-y: auto;
             scrollbar-gutter: stable;
+        }
+        
+        /* Utility for handling long words in RSVP */
+        .break-anywhere {
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
     </style>
 <script type="importmap">

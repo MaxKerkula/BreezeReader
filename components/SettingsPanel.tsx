@@ -3,7 +3,8 @@ import React from 'react';
 import { ReadingSettings, Theme, ReadingMode } from '../types';
 import { 
   Type, Moon, Sun, Coffee, Zap, Sliders, 
-  Layers, ArrowRightLeft, AlignLeft, Bold, Target 
+  Layers, ArrowRightLeft, AlignLeft, Bold, Target,
+  BrainCircuit, BookOpen
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -58,6 +59,35 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings }) 
               {drill.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Dictionary Engine */}
+      <div className="space-y-4">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Dictionary Engine</label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => updateSetting('dictionaryMode', 'ai')}
+            className={`py-4 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex flex-col items-center gap-2 border ${
+              settings.dictionaryMode === 'ai'
+              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+              : 'bg-black border-white/5 text-slate-500'
+            }`}
+          >
+            <BrainCircuit className="w-4 h-4" />
+            AI Context (Best)
+          </button>
+          <button
+            onClick={() => updateSetting('dictionaryMode', 'standard')}
+            className={`py-4 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex flex-col items-center gap-2 border ${
+              settings.dictionaryMode === 'standard'
+              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+              : 'bg-black border-white/5 text-slate-500'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            Standard (Free)
+          </button>
         </div>
       </div>
 
